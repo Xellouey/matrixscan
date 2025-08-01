@@ -9,7 +9,13 @@ from flask import Flask, render_template_string, jsonify, request, send_from_dir
 import os
 import json
 from datetime import datetime, date
-from database import get_checked_stores_for_date, get_all_regions, get_networks_by_region, get_stores_by_network, get_last_price_in_network, save_price_check, get_price_check
+# Используем демо базу данных для Vercel
+try:
+    from database_demo import get_checked_stores_for_date, get_all_regions, get_networks_by_region, get_stores_by_network, get_last_price_in_network, save_price_check, get_price_check
+    logger.info("Используется демо база данных")
+except ImportError:
+    from database import get_checked_stores_for_date, get_all_regions, get_networks_by_region, get_stores_by_network, get_last_price_in_network, save_price_check, get_price_check
+    logger.info("Используется локальная база данных")
 import logging
 from dotenv import load_dotenv
 
@@ -192,7 +198,10 @@ def save_and_send():
         logger.info(f"Сохранение и отправка для магазина {store_name} (ID: {store_id}): {len(checked_items)}/{total_items}")
         
         # Сохраняем данные в базу
-        from database import record_check_results, get_nomenclature_by_store_id
+        try:
+            from database_demo import record_check_results, get_nomenclature_by_store_id
+        except ImportError:
+            from database import record_check_results, get_nomenclature_by_store_id
         from datetime import date
         
         try:
@@ -236,7 +245,10 @@ def send_to_telegram():
     """API для отправки сообщений и файлов в Telegram"""
     try:
         # Импорты в начале функции
-        from database import create_store_report
+        try:
+            from database_demo import create_store_report
+        except ImportError:
+            from database import create_store_report
         from datetime import date
         import os
         
@@ -417,33 +429,51 @@ def get_store_addresses_from_excel():
 def get_store_details(store_id):
     """Получает подробную информацию о магазине из базы данных и Excel файлов"""
     try:
-        from database import cursor
-        
-        # Получаем базовую информацию из БД
-        cursor.execute("""
-            SELECT s.number as name, s.address, n.name as network_name
-            FROM stores s
-            LEFT JOIN networks n ON s.network_id = n.id  
-            WHERE s.id = ?
-        """, (store_id,))
-        
-        result = cursor.fetchone()
-        
-        if not result:
-            return None
+        try:
+            from database_demo import DEMO_STORES, DEMO_NETWORKS
+            # В демо режиме используем статические данные
+            store_data = next((s for s in DEMO_STORES if s[0] == store_id), None)
+            if not store_data:
+                return None
+                
+            network_data = next((n for n in DEMO_NETWORKS if n[0] == store_data[3]), None)
+            network_name = network_data[1] if network_data else "Неизвестная сеть"
             
-        store_info = {
-            'name': result['name'],
-            'address': result['address'] or 'Адрес не указан',
-            'network_name': result['network_name'],
-            'region_name': 'СЗФО'  # Из названий файлов видно что это СЗФО
-        }
-        
-        # Получаем адрес из Excel файлов
-        store_addresses = get_store_addresses_from_excel()
-        if store_id in store_addresses:
-            store_info['address'] = store_addresses[store_id]
-            logger.info(f"Найден адрес для магазина {store_id}: {store_addresses[store_id]}")
+            store_info = {
+                'name': store_data[1],
+                'address': store_data[2] or 'Адрес не указан',
+                'network_name': network_name,
+                'region_name': 'СЗФО'
+            }
+            
+        except ImportError:
+            from database import cursor
+            
+            # Получаем базовую информацию из БД
+            cursor.execute("""
+                SELECT s.number as name, s.address, n.name as network_name
+                FROM stores s
+                LEFT JOIN networks n ON s.network_id = n.id  
+                WHERE s.id = ?
+            """, (store_id,))
+            
+            result = cursor.fetchone()
+            
+            if not result:
+                return None
+                
+            store_info = {
+                'name': result['name'],
+                'address': result['address'] or 'Адрес не указан',
+                'network_name': result['network_name'],
+                'region_name': 'СЗФО'  # Из названий файлов видно что это СЗФО
+            }
+            
+            # Получаем адрес из Excel файлов
+            store_addresses = get_store_addresses_from_excel()
+            if store_id in store_addresses:
+                store_info['address'] = store_addresses[store_id]
+                logger.info(f"Найден адрес для магазина {store_id}: {store_addresses[store_id]}")
         
         return store_info
             
@@ -474,7 +504,10 @@ def create_professional_excel_report():
         logger.info(f"🛡️ СТРОГО ЗАЩИЩЕННОЕ создание Excel отчета для магазина {store_name} (ID: {store_id})")
         
         # Сначала сохраняем данные в базу
-        from database import record_check_results, get_nomenclature_by_store_id
+        try:
+            from database_demo import record_check_results, get_nomenclature_by_store_id
+        except ImportError:
+            from database import record_check_results, get_nomenclature_by_store_id
         
         try:
             # Получаем всю номенклатуру магазина
@@ -645,7 +678,10 @@ def search_stores(network_id):
             })
         
         # Используем функцию поиска из database.py
-        from database import find_stores_in_network
+        try:
+            from database_demo import find_stores_in_network
+        except ImportError:
+            from database import find_stores_in_network
         stores_data = find_stores_in_network(network_id, query)
         checked_stores = get_checked_stores_for_date(date.today())
         
@@ -683,7 +719,10 @@ def search_stores(network_id):
 def nomenclature(store_id):
     """API для получения номенклатуры магазина"""
     try:
-        from database import get_nomenclature_by_store_id, get_checked_items_for_store_date
+        try:
+            from database_demo import get_nomenclature_by_store_id, get_checked_items_for_store_date
+        except ImportError:
+            from database import get_nomenclature_by_store_id, get_checked_items_for_store_date
         from datetime import date
         
         # Получаем номенклатуру для магазина
@@ -723,34 +762,68 @@ def today_report():
             })
         
         # Получаем детальную информацию о проверенных магазинах
-        from database import cursor
-        
-        cursor.execute("""
-            SELECT s.id, s.number, s.address, n.name as network_name,
-                   COUNT(mc.id) as total_checks,
-                   SUM(CASE WHEN mc.is_present = 1 THEN 1 ELSE 0 END) as present_items
-            FROM stores s
-            JOIN networks n ON s.network_id = n.id
-            JOIN monitoring_checks mc ON s.id = mc.store_id
-            WHERE mc.check_date = ? AND s.id IN ({})
-            GROUP BY s.id, s.number, s.address, n.name
-            ORDER BY s.number
-        """.format(','.join('?' * len(checked_stores))), 
-        [today] + list(checked_stores))
-        
-        stores_data = cursor.fetchall()
-        
-        stores_info = []
-        for store in stores_data:
-            stores_info.append({
-                'id': store['id'],
-                'number': store['number'],
-                'address': store['address'],
-                'network_name': store['network_name'],
-                'total_checks': store['total_checks'],
-                'present_items': store['present_items'],
-                'completion_rate': round((store['present_items'] / store['total_checks']) * 100, 1) if store['total_checks'] > 0 else 0
-            })
+        try:
+            from database_demo import cursor, monitoring_checks, DEMO_STORES, DEMO_NETWORKS
+            # В демо режиме создаем данные из памяти
+            stores_info = []
+            date_str = today.isoformat()
+            
+            for store_id in checked_stores:
+                # Находим информацию о магазине
+                store_data = next((s for s in DEMO_STORES if s[0] == store_id), None)
+                if not store_data:
+                    continue
+                    
+                # Находим сеть
+                network_data = next((n for n in DEMO_NETWORKS if n[0] == store_data[3]), None)
+                network_name = network_data[1] if network_data else "Неизвестная сеть"
+                
+                # Получаем данные проверки
+                store_checks = monitoring_checks.get(store_id, {})
+                date_checks = store_checks.get(date_str, {})
+                
+                total_checks = len(date_checks)
+                present_items = sum(1 for is_present in date_checks.values() if is_present)
+                
+                stores_info.append({
+                    'id': store_id,
+                    'number': store_data[1],
+                    'address': store_data[2],
+                    'network_name': network_name,
+                    'total_checks': total_checks,
+                    'present_items': present_items,
+                    'completion_rate': round((present_items / total_checks) * 100, 1) if total_checks > 0 else 0
+                })
+                
+        except ImportError:
+            from database import cursor
+            
+            cursor.execute("""
+                SELECT s.id, s.number, s.address, n.name as network_name,
+                       COUNT(mc.id) as total_checks,
+                       SUM(CASE WHEN mc.is_present = 1 THEN 1 ELSE 0 END) as present_items
+                FROM stores s
+                JOIN networks n ON s.network_id = n.id
+                JOIN monitoring_checks mc ON s.id = mc.store_id
+                WHERE mc.check_date = ? AND s.id IN ({})
+                GROUP BY s.id, s.number, s.address, n.name
+                ORDER BY s.number
+            """.format(','.join('?' * len(checked_stores))), 
+            [today] + list(checked_stores))
+            
+            stores_data = cursor.fetchall()
+            
+            stores_info = []
+            for store in stores_data:
+                stores_info.append({
+                    'id': store['id'],
+                    'number': store['number'],
+                    'address': store['address'],
+                    'network_name': store['network_name'],
+                    'total_checks': store['total_checks'],
+                    'present_items': store['present_items'],
+                    'completion_rate': round((store['present_items'] / store['total_checks']) * 100, 1) if store['total_checks'] > 0 else 0
+                })
         
         return jsonify({
             'success': True,
