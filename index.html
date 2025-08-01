@@ -1,0 +1,2637 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Система мониторинга торговых сетей</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="Система мониторинга торговых сетей - проверка номенклатуры магазинов">
+    <meta name="theme-color" content="#2196F3">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Мониторинг">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="msapplication-TileColor" content="#2196F3">
+    <meta name="msapplication-tap-highlight" content="no">
+    <meta name="format-detection" content="telephone=no">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png">
+    <link rel="shortcut icon" href="/icon-192.png">
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            padding: 16px;
+            min-height: 100vh;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: linear-gradient(135deg, #2196F3, #1976D2);
+            border-radius: 12px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .menu-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .menu-item {
+            background: var(--tg-theme-button-color, #2196F3);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            border-radius: 12px;
+            padding: 16px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 56px;
+        }
+
+        .menu-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+        }
+
+        .screen {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .back-button {
+            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            color: var(--tg-theme-text-color, #000000);
+            border: none;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .list-item {
+            background: var(--tg-theme-secondary-bg-color, #f8f9fa);
+            border: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .list-item:hover {
+            background: var(--tg-theme-button-color, #2196F3);
+            color: var(--tg-theme-button-text-color, #ffffff);
+        }
+
+        .store-item {
+            background: var(--tg-theme-secondary-bg-color, #f8f9fa);
+            border: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .store-item:hover {
+            background: var(--tg-theme-button-color, #2196F3);
+            color: var(--tg-theme-button-text-color, #ffffff);
+        }
+
+        .store-item.checked {
+            background: #4CAF50;
+            color: white;
+            border-color: #4CAF50;
+        }
+
+        .store-item .store-number {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .store-item .store-address {
+            font-size: 14px;
+            opacity: 0.8;
+            line-height: 1.3;
+        }
+
+        .store-item .store-status {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            font-size: 20px;
+        }
+
+        .nomenclature-item {
+            background: var(--tg-theme-secondary-bg-color, #f8f9fa);
+            border: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nomenclature-item.checked {
+            background: #4CAF50;
+            color: white;
+            border-color: #4CAF50;
+        }
+
+        .nomenclature-item .icon {
+            font-size: 20px;
+            min-width: 24px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--tg-theme-hint-color, #999999);
+        }
+
+        .spinner {
+            border: 3px solid var(--tg-theme-hint-color, #f3f3f3);
+            border-top: 3px solid var(--tg-theme-button-color, #2196F3);
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .report-info {
+            background: var(--tg-theme-secondary-bg-color, #f8f9fa);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .success-message {
+            background: #4CAF50;
+            color: white;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .error-message {
+            background: #f44336;
+            color: white;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .control-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .control-button {
+            padding: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .save-button {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .send-button {
+            background: #FF9800;
+            color: white;
+        }
+
+        /* Стили для пагинации */
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 16px 0;
+            padding: 12px;
+            background: var(--tg-theme-secondary-bg-color, #f8f9fa);
+            border-radius: 8px;
+        }
+
+        .pagination-button {
+            background: var(--tg-theme-button-color, #2196F3);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            border-radius: 6px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            min-width: 80px;
+        }
+
+        .pagination-button:disabled {
+            background: var(--tg-theme-hint-color, #cccccc);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .pagination-info {
+            font-size: 14px;
+            color: var(--tg-theme-text-color, #000000);
+            text-align: center;
+        }
+
+        /* Стили для кнопки сканирования штрих-кода */
+        .barcode-scan-button {
+            background: linear-gradient(135deg, #FF6B35, #F7931E);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 16px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin: 16px auto;
+            width: 80%;
+            max-width: 300px;
+            box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+        }
+
+        .barcode-scan-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(255, 107, 53, 0.4);
+        }
+
+        .barcode-scan-button:active {
+            transform: translateY(0);
+        }
+
+        /* Стили для модального окна сканера */
+        .scanner-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .scanner-content {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 95%;
+            max-height: 95%;
+            position: relative;
+            overflow-y: auto;
+        }
+
+        #scanner-video-container {
+            width: 100%;
+            max-width: 400px;
+            height: 300px;
+            margin: 0 auto;
+            position: relative;
+            border: 2px solid #FF6B35;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        #scanner-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .scanner-close {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        #barcode-result {
+            background: #e8f5e8;
+            border: 1px solid #4CAF50;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        /* Стили для календаря */
+        .calendar-container {
+            background: var(--tg-theme-secondary-bg-color, #f8f9fa);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .calendar-nav {
+            background: var(--tg-theme-button-color, #2196F3);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .calendar-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--tg-theme-text-color, #000000);
+        }
+
+        .calendar-weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .calendar-weekday {
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--tg-theme-hint-color, #999999);
+            padding: 8px 4px;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            border: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+            border-radius: 6px;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .calendar-day:hover:not(.disabled):not(.empty) {
+            background: var(--tg-theme-button-color, #2196F3);
+            color: var(--tg-theme-button-text-color, #ffffff);
+        }
+
+        .calendar-day.today {
+            background: #4CAF50;
+            color: white;
+            font-weight: 600;
+        }
+
+        .calendar-day.selected {
+            background: var(--tg-theme-button-color, #2196F3);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            font-weight: 600;
+        }
+
+        .calendar-day.disabled {
+            background: var(--tg-theme-hint-color, #f0f0f0);
+            color: var(--tg-theme-subtitle-text-color, #999999);
+            cursor: not-allowed;
+        }
+
+        .calendar-day.empty {
+            border: none;
+            background: transparent;
+            cursor: default;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Главное меню -->
+    <div id="main-screen" class="screen active">
+        <div class="header">
+            <h1>🏪 Система мониторинга торговых сетей</h1>
+            <p>Главное меню</p>
+        </div>
+
+        <div class="menu-grid">
+            <button class="menu-item" onclick="startMonitoring()">
+                🚀 Начать мониторинг
+            </button>
+            <button class="menu-item" onclick="showTodayReport()">
+                📊 Отчет за сегодня
+            </button>
+            <button class="menu-item" onclick="showPeriodReport()">
+                📅 Отчет за период
+            </button>
+        </div>
+    </div>
+
+    <!-- Экран выбора региона -->
+    <div id="region-screen" class="screen">
+        <button class="back-button" onclick="showMainScreen()">
+            ⬅️ Назад
+        </button>
+
+        <div class="header">
+            <h1>🌍 Выбор региона</h1>
+            <p>Выберите регион для мониторинга</p>
+        </div>
+
+        <div id="region-content">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Загрузка регионов...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Экран выбора сети -->
+    <div id="network-screen" class="screen">
+        <button class="back-button" onclick="showRegionScreen()">
+            ⬅️ К регионам
+        </button>
+
+        <div class="header">
+            <h1>🏬 Выбор сети</h1>
+            <p>Выберите торговую сеть</p>
+        </div>
+
+        <div id="network-content">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Загрузка сетей...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Экран выбора магазина -->
+    <div id="store-screen" class="screen">
+        <button class="back-button" onclick="showNetworkScreen()">
+            ⬅️ К сетям
+        </button>
+
+        <div class="header">
+            <h1>🏪 Выбор магазина</h1>
+            <p>Выберите магазин для проверки</p>
+        </div>
+
+        <!-- Поиск магазинов -->
+        <div class="search-container" style="margin-bottom: 16px;">
+            <input type="text" id="store-search" placeholder="🔍 Поиск по номеру или адресу магазина..."
+                style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;"
+                oninput="searchStores()" />
+        </div>
+
+        <!-- Пагинация -->
+        <div id="pagination-container" class="pagination-container" style="display: none;">
+            <button id="prev-page" class="pagination-button" onclick="changePage(-1)">
+                ⬅️ Назад
+            </button>
+            <div id="pagination-info" class="pagination-info">
+                Страница 1 из 1
+            </div>
+            <button id="next-page" class="pagination-button" onclick="changePage(1)">
+                Вперед ➡️
+            </button>
+        </div>
+
+        <div id="store-content">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Загрузка магазинов...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Экран проверки номенклатуры -->
+    <div id="nomenclature-screen" class="screen">
+        <button class="back-button" onclick="showStoreScreen()">
+            ⬅️ К магазинам
+        </button>
+
+        <div class="header">
+            <h1>📋 Проверка номенклатуры</h1>
+            <p id="store-info">Магазин</p>
+        </div>
+
+        <div class="report-info">
+            <p>✅ Отметьте наличие товаров в магазине</p>
+        </div>
+
+        <!-- Кнопка сканирования штрих-кода -->
+        <button class="barcode-scan-button" onclick="openBarcodeScanner()">
+            📷 Сканировать штрих-код
+        </button>
+
+        <!-- Результат сканирования -->
+        <div id="barcode-result">
+            <strong>🔍 Найден товар:</strong>
+            <div id="found-product"></div>
+        </div>
+
+        <div id="nomenclature-content">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Загрузка номенклатуры...</p>
+            </div>
+        </div>
+
+        <div class="control-buttons">
+            <button class="control-button save-button" onclick="saveProgress()">
+                ✅ Сохранить и вернуться
+            </button>
+            <button class="control-button send-button" onclick="showReportPreview()">
+                📤 Сохранить и отправить
+            </button>
+        </div>
+
+        <!-- Кнопка отладки -->
+        <div style="margin-top: 20px; text-align: center;">
+            <button onclick="toggleDebugMode()"
+                style="padding: 8px 16px; background: #666; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">
+                🔍 Показать/скрыть отладку
+            </button>
+        </div>
+
+        <!-- Лог для отладки -->
+        <div id="debug-log"
+            style="margin-top: 10px; padding: 10px; background: #f0f0f0; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto; display: none; border-radius: 4px;">
+            <strong>🔍 Лог отладки:</strong><br>
+            <div id="debug-content"></div>
+        </div>
+    </div>
+
+    <!-- Экран предпросмотра отчета -->
+    <div id="report-preview-screen" class="screen">
+        <button class="back-button" onclick="showNomenclatureScreen()">
+            ⬅️ Назад к проверке
+        </button>
+
+        <div class="header">
+            <h1>📊 Предпросмотр отчета</h1>
+            <p id="preview-store-info">Магазин</p>
+        </div>
+
+        <div id="report-summary" class="report-info">
+            <!-- Сводка будет заполнена JavaScript -->
+        </div>
+
+        <div style="margin: 20px 0;">
+            <label for="inspector-name" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                👤 ФИО проверяющего:
+            </label>
+            <input type="text" id="inspector-name" placeholder="Введите ваше ФИО..."
+                style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; margin-bottom: 15px;" />
+
+            <label for="report-comment" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                💬 Комментарий к отчету (необязательно):
+            </label>
+            <textarea id="report-comment" placeholder="Добавьте комментарий к отчету..."
+                style="width: 100%; height: 80px; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; resize: vertical;"></textarea>
+        </div>
+
+        <div style="margin: 20px 0;">
+            <button onclick="downloadExcelPreview()"
+                style="width: 100%; padding: 15px; background: #2196F3; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer;">
+                📊 Скачать Excel отчет для просмотра
+            </button>
+        </div>
+
+        <div class="control-buttons">
+            <button class="control-button save-button" onclick="showNomenclatureScreen()">
+                ⬅️ Вернуться к проверке
+            </button>
+            <button class="control-button send-button" onclick="finalSaveAndSend()">
+                📤 Отправить отчет в Telegram
+            </button>
+        </div>
+    </div>
+
+    <!-- Экран отчета за сегодня -->
+    <div id="today-report-screen" class="screen">
+        <button class="back-button" onclick="showMainScreen()">
+            ⬅️ Назад
+        </button>
+
+        <div class="header">
+            <h1>📊 Отчет за сегодня</h1>
+            <p id="today-date"></p>
+        </div>
+
+        <div id="today-report-content">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Загрузка данных...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Экран отчета за период -->
+    <div id="period-report-screen" class="screen">
+        <button class="back-button" onclick="showMainScreen()">
+            ⬅️ Назад
+        </button>
+
+        <div class="header">
+            <h1>📅 Отчет за период</h1>
+            <p>Выберите период для отчета</p>
+        </div>
+
+        <div id="period-step" class="report-info">
+            <p>Шаг 1/2: Выберите начальную дату</p>
+        </div>
+
+        <div id="period-report-content">
+            <div class="calendar-container">
+                <div class="calendar-header">
+                    <button class="calendar-nav" onclick="changeYear(-1)">‹‹</button>
+                    <button class="calendar-nav" onclick="changeMonth(-1)">‹</button>
+                    <div id="calendar-title" class="calendar-title">Январь 2025</div>
+                    <button class="calendar-nav" onclick="changeMonth(1)">›</button>
+                    <button class="calendar-nav" onclick="changeYear(1)">››</button>
+                </div>
+
+                <div class="calendar-weekdays">
+                    <div class="calendar-weekday">Пн</div>
+                    <div class="calendar-weekday">Вт</div>
+                    <div class="calendar-weekday">Ср</div>
+                    <div class="calendar-weekday">Чт</div>
+                    <div class="calendar-weekday">Пт</div>
+                    <div class="calendar-weekday">Сб</div>
+                    <div class="calendar-weekday">Вс</div>
+                </div>
+
+                <div id="calendar-grid" class="calendar-grid">
+                    <!-- Дни календаря будут добавлены через JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно сканера штрих-кода -->
+    <div id="scanner-modal" class="scanner-modal">
+        <div class="scanner-content">
+            <span class="scanner-close" onclick="closeBarcodeScanner()">&times;</span>
+            <h3 style="text-align: center; margin-bottom: 20px;">📷 Сканирование штрих-кода</h3>
+
+            <!-- Контейнер для видео -->
+            <div id="scanner-video-container">
+                <div id="scanner-overlay"
+                    style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 200px; height: 100px; border: 2px solid #FF6B35; border-radius: 4px; z-index: 10;">
+                </div>
+            </div>
+
+            <!-- Кнопки управления -->
+            <div style="text-align: center; margin: 20px 0;">
+                <button id="start-scan-btn" onclick="startScanning()"
+                    style="padding: 12px 24px; background: #4CAF50; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin: 5px;">
+                    ▶️ Начать сканирование
+                </button>
+                <button id="stop-scan-btn" onclick="stopScanning()"
+                    style="padding: 12px 24px; background: #f44336; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin: 5px; display: none;">
+                    ⏹️ Остановить
+                </button>
+            </div>
+
+            <!-- Ручной ввод -->
+            <div style="text-align: center; margin: 20px 0;">
+                <input type="text" id="manual-barcode" placeholder="Введите штрих-код или название товара..."
+                    style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; margin-bottom: 10px;" />
+                <button onclick="searchByBarcode()"
+                    style="width: 100%; padding: 12px; background: #2196F3; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer;">
+                    🔍 Найти товар
+                </button>
+
+                <!-- Быстрые кнопки для тестирования -->
+                <div style="margin-top: 15px;">
+                    <div style="color: #666; margin-bottom: 10px; font-size: 14px;">⚡ Быстрый поиск:</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <button onclick="quickSearch('123')"
+                            style="background: #4CAF50; color: white; border: none; padding: 10px; border-radius: 5px; font-size: 14px; cursor: pointer;">123
+                            - Молоко</button>
+                        <button onclick="quickSearch('456')"
+                            style="background: #4CAF50; color: white; border: none; padding: 10px; border-radius: 5px; font-size: 14px; cursor: pointer;">456
+                            - Хлеб</button>
+                        <button onclick="quickSearch('молоко')"
+                            style="background: #2196F3; color: white; border: none; padding: 10px; border-radius: 5px; font-size: 14px; cursor: pointer;">🥛
+                            молоко</button>
+                        <button onclick="quickSearch('хлеб')"
+                            style="background: #2196F3; color: white; border: none; padding: 10px; border-radius: 5px; font-size: 14px; cursor: pointer;">🍞
+                            хлеб</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Статус -->
+            <div id="scanner-status" style="text-align: center; color: #666; margin: 10px 0; font-size: 14px;">
+                Нажмите "Начать сканирование" или введите код вручную
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Инициализация Telegram Web App
+        let tg = null;
+
+        try {
+            if (typeof window !== 'undefined' && window.Telegram && window.Telegram.WebApp) {
+                tg = window.Telegram.WebApp;
+                tg.expand();
+                tg.ready();
+                console.log('✅ Telegram Web App инициализирован');
+            } else {
+                console.log('⚠️ Telegram Web App недоступен, используем fallback');
+                tg = {
+                    ready: () => { },
+                    expand: () => { },
+                    MainButton: {
+                        hide: () => { },
+                        show: () => { },
+                        setText: () => { },
+                        onClick: () => { }
+                    },
+                    BackButton: { hide: () => { }, show: () => { } },
+                    showAlert: (msg) => alert(msg),
+                    themeParams: {}
+                };
+            }
+        } catch (error) {
+            console.error('❌ Ошибка инициализации Telegram Web App:', error);
+            tg = {
+                ready: () => { },
+                expand: () => { },
+                MainButton: {
+                    hide: () => { },
+                    show: () => { },
+                    setText: () => { },
+                    onClick: () => { }
+                },
+                BackButton: { hide: () => { }, show: () => { } },
+                showAlert: (msg) => alert(msg),
+                themeParams: {}
+            };
+        }
+
+        // Глобальные переменные
+        let currentRegion = null;
+        let currentNetwork = null;
+        let currentStore = null;
+        let nomenclatureItems = [];
+        let checkedItems = new Set();
+        let debugMode = false;
+
+        // Переменные для календаря
+        let calendarStep = 1;
+        let selectedStartDate = null;
+        let selectedEndDate = null;
+        let currentDate = new Date();
+
+        // Функции навигации
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function showMainScreen() {
+            showScreen('main-screen');
+            tg.MainButton.hide();
+        }
+
+        function showRegionScreen() {
+            showScreen('region-screen');
+            loadRegions();
+        }
+
+        function showNetworkScreen() {
+            showScreen('network-screen');
+            loadNetworks();
+        }
+
+        function showStoreScreen() {
+            showScreen('store-screen');
+            loadStores();
+        }
+
+        function showNomenclatureScreen() {
+            showScreen('nomenclature-screen');
+            loadNomenclature();
+        }
+
+        function showReportPreview() {
+            if (!currentStore || nomenclatureItems.length === 0) {
+                alert('Нет данных для отчета');
+                return;
+            }
+
+            // Заполняем информацию о магазине
+            document.getElementById('preview-store-info').innerHTML = `
+                <strong>🏪 ${currentStore.name}</strong><br>
+                <small>📍 ${currentStore.address}</small>
+            `;
+
+            // Создаем сводку отчета
+            const presentCount = checkedItems.size;
+            const totalCount = nomenclatureItems.length;
+            const percentage = totalCount > 0 ? ((presentCount / totalCount) * 100).toFixed(1) : 0;
+
+            const summaryHtml = `
+                <h3>📈 Сводка проверки</h3>
+                <p><strong>📅 Дата:</strong> ${new Date().toLocaleDateString('ru-RU')}</p>
+                <p><strong>🏪 Магазин:</strong> ${currentStore.name}</p>
+                <p><strong>📍 Адрес:</strong> ${currentStore.address}</p>
+                <p><strong>📊 Всего товаров:</strong> ${totalCount}</p>
+                <p><strong>✅ В наличии:</strong> ${presentCount}</p>
+                <p><strong>❌ Отсутствует:</strong> ${totalCount - presentCount}</p>
+                <p><strong>📈 Процент наличия:</strong> ${percentage}%</p>
+                
+                <h4>✅ Товары в наличии:</h4>
+                <div style="max-height: 150px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 5px; font-size: 12px;">
+                    ${Array.from(checkedItems).map(item => `• ${item}`).join('<br>')}
+                </div>
+                
+                ${totalCount - presentCount > 0 ? `
+                <h4>❌ Отсутствующие товары:</h4>
+                <div style="max-height: 150px; overflow-y: auto; background: #fff2f2; padding: 10px; border-radius: 5px; font-size: 12px;">
+                    ${nomenclatureItems.filter(item => !checkedItems.has(item)).map(item => `• ${item}`).join('<br>')}
+                </div>
+                ` : ''}
+            `;
+
+            document.getElementById('report-summary').innerHTML = summaryHtml;
+
+            // Очищаем поля
+            document.getElementById('inspector-name').value = '';
+            document.getElementById('report-comment').value = '';
+
+            showScreen('report-preview-screen');
+        }
+
+        async function downloadExcelPreview() {
+            if (!currentStore || nomenclatureItems.length === 0) {
+                alert('Нет данных для создания отчета');
+                return;
+            }
+
+            try {
+                // Создаем Excel отчет через API создания отчета
+                const response = await fetch('/api/create-excel-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        store_id: currentStore.id,
+                        store_name: currentStore.name,
+                        checked_items: Array.from(checkedItems),
+                        total_items: nomenclatureItems.length
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.report_file) {
+                    // Скачиваем созданный файл
+                    const downloadUrl = `/api/download-file?file=${encodeURIComponent(data.report_file)}`;
+
+                    // Создаем ссылку для скачивания
+                    const link = document.createElement('a');
+                    link.href = downloadUrl;
+                    link.download = data.report_file.split('/').pop();
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    alert('📊 Excel отчет скачан! Проверьте папку загрузок.');
+                } else {
+                    alert('❌ Ошибка создания отчета: ' + (data.error || 'Неизвестная ошибка'));
+                }
+
+            } catch (error) {
+                alert('❌ Ошибка: ' + error.message);
+            }
+        }
+
+        // Основные функции меню
+        function startMonitoring() {
+            showRegionScreen();
+        }
+
+        function showTodayReport() {
+            showScreen('today-report-screen');
+            loadTodayReport();
+        }
+
+        function showPeriodReport() {
+            showScreen('period-report-screen');
+            initCalendar();
+        }
+
+        // КАЛЕНДАРЬ - РЕАЛЬНАЯ РЕАЛИЗАЦИЯ
+        function initCalendar() {
+            calendarStep = 1;
+            selectedStartDate = null;
+            selectedEndDate = null;
+            currentDate = new Date();
+            document.getElementById('period-step').innerHTML = '<p>Шаг 1/2: Выберите начальную дату</p>';
+            generateCalendar();
+        }
+
+        function generateCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+
+            // Обновляем заголовок календаря
+            const titleElement = document.getElementById('calendar-title');
+            if (titleElement) {
+                titleElement.textContent = `${monthNames[month]} ${year}`;
+            }
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const today = new Date();
+
+            let calendarHtml = '';
+            const startDay = firstDay === 0 ? 6 : firstDay - 1; // Понедельник = 0
+
+            // Пустые ячейки в начале
+            for (let i = 0; i < startDay; i++) {
+                calendarHtml += '<div class="calendar-day empty"></div>';
+            }
+
+            // Дни месяца
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = new Date(year, month, day);
+                const isToday = date.toDateString() === today.toDateString();
+                const isFuture = date > today;
+                const isSelected = (selectedStartDate && date.toDateString() === selectedStartDate.toDateString()) ||
+                    (selectedEndDate && date.toDateString() === selectedEndDate.toDateString());
+
+                let className = 'calendar-day';
+                if (isToday) className += ' today';
+                if (isFuture) className += ' disabled';
+                if (isSelected) className += ' selected';
+
+                const onclick = isFuture ? '' : `onclick="selectDate(${year}, ${month}, ${day})"`;
+                calendarHtml += `<button class="${className}" ${onclick}>${day}</button>`;
+            }
+
+            // Обновляем календарь
+            const gridElement = document.getElementById('calendar-grid');
+            if (gridElement) {
+                gridElement.innerHTML = calendarHtml;
+            }
+        }
+
+        function changeMonth(delta) {
+            currentDate.setMonth(currentDate.getMonth() + delta);
+            generateCalendar();
+        }
+
+        function changeYear(delta) {
+            currentDate.setFullYear(currentDate.getFullYear() + delta);
+            generateCalendar();
+        }
+
+        function selectDate(year, month, day) {
+            const selectedDate = new Date(year, month, day);
+
+            if (calendarStep === 1) {
+                selectedStartDate = selectedDate;
+                calendarStep = 2;
+                document.getElementById('period-step').innerHTML =
+                    `<p>Начальная дата: ${selectedDate.toLocaleDateString('ru-RU')}</p><p>Шаг 2/2: Выберите конечную дату</p>`;
+                generateCalendar();
+            } else {
+                if (selectedDate < selectedStartDate) {
+                    safeShowAlert('Конечная дата не может быть раньше начальной!');
+                    return;
+                }
+                selectedEndDate = selectedDate;
+                generatePeriodReport();
+            }
+        }
+
+        // Безопасная функция для показа уведомлений
+        function safeShowAlert(message) {
+            try {
+                // Проверяем, что Telegram Web App доступен и метод существует
+                if (typeof window !== 'undefined' &&
+                    window.Telegram &&
+                    window.Telegram.WebApp &&
+                    typeof window.Telegram.WebApp.showAlert === 'function') {
+                    window.Telegram.WebApp.showAlert(message);
+                } else {
+                    // Fallback на обычный alert
+                    alert(message);
+                }
+            } catch (error) {
+                console.error('Ошибка показа уведомления:', error);
+                // В случае любой ошибки используем обычный alert
+                alert(message);
+            }
+        }
+
+        async function generatePeriodReport() {
+            const content = document.getElementById('period-report-content');
+
+            // Проверяем что даты выбраны
+            if (!selectedStartDate || !selectedEndDate) {
+                content.innerHTML = `
+                    <div class="error-message">
+                        ❌ Ошибка: Не выбраны даты периода
+                    </div>
+                `;
+                safeShowAlert('Ошибка: Не выбраны даты периода');
+                return;
+            }
+
+            content.innerHTML = `
+                <div class="success-message">
+                    ⏳ Генерация отчета за период...
+                </div>
+                <div class="report-info">
+                    <h3>📈 Отчет за период</h3>
+                    <p>С ${selectedStartDate.toLocaleDateString('ru-RU')} по ${selectedEndDate.toLocaleDateString('ru-RU')}</p>
+                    <p>Создание Excel файла...</p>
+                </div>
+            `;
+
+            try {
+                console.log('Отправка запроса на создание отчета...');
+
+                const response = await fetch('/api/generate-period-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        start_date: selectedStartDate.toISOString().split('T')[0],
+                        end_date: selectedEndDate.toISOString().split('T')[0]
+                    })
+                });
+
+                console.log('Получен ответ:', response.status);
+                const data = await response.json();
+                console.log('Данные ответа:', data);
+
+                if (response.ok && data.success) {
+                    content.innerHTML = `
+                        <div class="success-message">
+                            ✅ Отчет создан успешно!
+                        </div>
+                        <div class="report-info">
+                            <h3>📈 ${data.message}</h3>
+                            <p>📁 Файл сохранен в папку reports/</p>
+                            <p>🏪 Проверено магазинов: ${data.stores_count}</p>
+                        </div>
+                        <div style="margin: 20px 0;">
+                            <button onclick="downloadPeriodReport()" style="width: 100%; padding: 15px; background: #4CAF50; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer;">
+                                📊 Скачать Excel отчет
+                            </button>
+                        </div>
+                    `;
+
+                    safeShowAlert('✅ Отчет создан успешно!');
+
+                } else {
+                    // Обрабатываем ошибки
+                    const errorMessage = data.error || 'Неизвестная ошибка';
+                    content.innerHTML = `
+                        <div class="error-message">
+                            ❌ ${errorMessage}
+                        </div>
+                        <div style="margin: 20px 0;">
+                            <button onclick="initCalendar()" style="width: 100%; padding: 15px; background: #2196F3; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer;">
+                                🔄 Попробовать снова
+                            </button>
+                        </div>
+                    `;
+
+                    safeShowAlert('❌ ' + errorMessage);
+                }
+            } catch (error) {
+                console.error('Ошибка запроса:', error);
+                content.innerHTML = `
+                    <div class="error-message">
+                        ❌ Ошибка соединения: ${error.message}
+                    </div>
+                    <div style="margin: 20px 0;">
+                        <button onclick="initCalendar()" style="width: 100%; padding: 15px; background: #2196F3; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer;">
+                            🔄 Попробовать снова
+                        </button>
+                    </div>
+                `;
+
+                safeShowAlert('❌ Ошибка соединения: ' + error.message);
+            }
+        }
+
+        // Функция скачивания отчета за период
+        function downloadPeriodReport() {
+            if (!selectedStartDate || !selectedEndDate) {
+                safeShowAlert('Ошибка: даты не выбраны');
+                return;
+            }
+
+            try {
+                const startDateStr = selectedStartDate.toISOString().split('T')[0];
+                const endDateStr = selectedEndDate.toISOString().split('T')[0];
+
+                const downloadUrl = `/api/download-period-report?start_date=${startDateStr}&end_date=${endDateStr}`;
+
+                console.log('Скачивание отчета:', downloadUrl);
+
+                // Создаем скрытую ссылку для скачивания
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = `Отчет_${startDateStr}_по_${endDateStr}.xlsx`;
+                link.target = '_blank'; // Открываем в новой вкладке для надежности
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                safeShowAlert('📊 Скачивание отчета начато!');
+
+            } catch (error) {
+                console.error('Ошибка скачивания:', error);
+                safeShowAlert('❌ Ошибка скачивания: ' + error.message);
+            }
+        }
+
+        // Переменные для поиска магазинов и пагинации
+        let searchTimeout = null;
+        let allStores = [];
+        let currentPage = 1;
+        let storesPerPage = 30;
+        let isSearchMode = false;
+
+        // Переменные для сканера штрих-кода
+        let scannerStream = null;
+        let isScanning = false;
+
+        // Функция поиска магазинов
+        async function searchStores() {
+            const query = document.getElementById('store-search').value.trim();
+
+            // Очищаем предыдущий таймер
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+
+            // Устанавливаем новый таймер для задержки поиска
+            searchTimeout = setTimeout(async () => {
+                if (query.length === 0) {
+                    // Если поиск пустой, возвращаемся к пагинации
+                    isSearchMode = false;
+                    currentPage = 1;
+                    displayCurrentPage();
+                    return;
+                }
+
+                if (query.length < 2) {
+                    // Слишком короткий запрос
+                    return;
+                }
+
+                try {
+                    isSearchMode = true;
+                    const response = await fetch(`/api/search-stores/${currentNetwork.id}?q=${encodeURIComponent(query)}`);
+                    const data = await response.json();
+
+                    if (data.success) {
+                        displayStores(data.stores, true); // true = режим поиска
+                    } else {
+                        console.error('Ошибка поиска:', data.error);
+                    }
+                } catch (error) {
+                    console.error('Ошибка поиска магазинов:', error);
+                }
+            }, 300); // Задержка 300мс
+        }
+
+        // Функция отображения списка магазинов
+        function displayStores(stores, searchMode = false) {
+            const content = document.getElementById('store-content');
+            const paginationContainer = document.getElementById('pagination-container');
+
+            if (stores.length === 0) {
+                content.innerHTML = `
+                    <div class="loading">
+                        <p>🔍 Магазины не найдены</p>
+                        <p>Попробуйте изменить поисковый запрос</p>
+                    </div>
+                `;
+                paginationContainer.style.display = 'none';
+                return;
+            }
+
+            // В режиме поиска показываем все результаты без пагинации
+            if (searchMode) {
+                paginationContainer.style.display = 'none';
+            } else {
+                paginationContainer.style.display = 'flex';
+            }
+
+            let html = '';
+            stores.forEach(store => {
+                const statusIcon = store.status === 'checked' ? '✅' : '⏳';
+                const statusClass = store.status === 'checked' ? 'checked' : '';
+
+                html += `
+                    <div class="store-item ${statusClass}" onclick="selectStore(${store.id}, '${store.name}', '${store.address.replace(/'/g, "\\'")}')">
+                        <div class="store-status">${statusIcon}</div>
+                        <div class="store-number">🏪 ${store.name}</div>
+                        <div class="store-address">📍 ${store.address}</div>
+                    </div>
+                `;
+            });
+
+            content.innerHTML = html;
+        }
+
+        // Функция отображения текущей страницы
+        function displayCurrentPage() {
+            if (allStores.length === 0) return;
+
+            const startIndex = (currentPage - 1) * storesPerPage;
+            const endIndex = startIndex + storesPerPage;
+            const currentStores = allStores.slice(startIndex, endIndex);
+
+            displayStores(currentStores, false);
+            updatePaginationInfo();
+        }
+
+        // Функция обновления информации о пагинации
+        function updatePaginationInfo() {
+            const totalPages = Math.ceil(allStores.length / storesPerPage);
+            const paginationInfo = document.getElementById('pagination-info');
+            const prevButton = document.getElementById('prev-page');
+            const nextButton = document.getElementById('next-page');
+
+            paginationInfo.textContent = `Страница ${currentPage} из ${totalPages} (${allStores.length} магазинов)`;
+
+            prevButton.disabled = currentPage <= 1;
+            nextButton.disabled = currentPage >= totalPages;
+        }
+
+        // Функция смены страницы
+        function changePage(direction) {
+            const totalPages = Math.ceil(allStores.length / storesPerPage);
+
+            if (direction === -1 && currentPage > 1) {
+                currentPage--;
+            } else if (direction === 1 && currentPage < totalPages) {
+                currentPage++;
+            }
+
+            displayCurrentPage();
+        }
+
+        // Загрузка данных
+        async function loadRegions() {
+            const content = document.getElementById('region-content');
+
+            try {
+                const response = await fetch('/api/regions');
+                const data = await response.json();
+
+                if (data.success && data.regions.length > 0) {
+                    let regionsHtml = '';
+                    data.regions.forEach(region => {
+                        regionsHtml += `
+                            <div class="list-item" onclick="selectRegion(${region.id}, '${region.name}')">
+                                <h3>🌍 ${region.name}</h3>
+                                <p>Регион для мониторинга</p>
+                            </div>
+                        `;
+                    });
+                    content.innerHTML = regionsHtml;
+                } else {
+                    content.innerHTML = '<div class="error-message">Регионы не найдены</div>';
+                }
+            } catch (error) {
+                content.innerHTML = `<div class="error-message">Ошибка: ${error.message}</div>`;
+            }
+        }
+
+        async function loadNetworks() {
+            const content = document.getElementById('network-content');
+
+            if (!currentRegion) {
+                content.innerHTML = '<div class="error-message">Регион не выбран</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/networks/${currentRegion.id}`);
+                const data = await response.json();
+
+                let networksHtml = '';
+
+                if (data.success && data.networks.length > 0) {
+                    data.networks.forEach(network => {
+                        networksHtml += `
+                            <div class="list-item" onclick="selectNetwork(${network.id}, '${network.name}')">
+                                <h3>🏬 ${network.name}</h3>
+                                <p>Торговая сеть</p>
+                            </div>
+                        `;
+                    });
+                } else {
+                    networksHtml += '<div class="error-message">Сети не найдены</div>';
+                }
+
+                content.innerHTML = networksHtml;
+            } catch (error) {
+                content.innerHTML = `<div class="error-message">Ошибка: ${error.message}</div>`;
+            }
+        }
+
+        async function loadStores() {
+            const content = document.getElementById('store-content');
+
+            if (!currentNetwork) {
+                content.innerHTML = '<div class="error-message">Сеть не выбрана</div>';
+                return;
+            }
+
+            // Очищаем поле поиска и сбрасываем состояние
+            document.getElementById('store-search').value = '';
+            currentPage = 1;
+            isSearchMode = false;
+
+            try {
+                const response = await fetch(`/api/stores/${currentNetwork.id}`);
+                const data = await response.json();
+
+                if (data.success && data.stores.length > 0) {
+                    // Сохраняем все магазины
+                    allStores = data.stores;
+
+                    // Отображаем первую страницу
+                    displayCurrentPage();
+                } else {
+                    content.innerHTML = '<div class="error-message">Магазины не найдены</div>';
+                    document.getElementById('pagination-container').style.display = 'none';
+                }
+            } catch (error) {
+                content.innerHTML = `<div class="error-message">Ошибка: ${error.message}</div>`;
+                document.getElementById('pagination-container').style.display = 'none';
+            }
+        }
+
+        async function loadNomenclature() {
+            const content = document.getElementById('nomenclature-content');
+
+            if (!currentStore) {
+                content.innerHTML = '<div class="error-message">Магазин не выбран</div>';
+                return;
+            }
+
+            // Обновляем информацию о магазине
+            document.getElementById('store-info').innerHTML = `
+                <strong>🏪 ${currentStore.name}</strong><br>
+                <small>📍 ${currentStore.address}</small>
+            `;
+
+            try {
+                const response = await fetch(`/api/nomenclature/${currentStore.id}`);
+                const data = await response.json();
+
+                if (data.success && data.items.length > 0) {
+                    nomenclatureItems = data.items;
+                    checkedItems = new Set(data.checked || []);
+
+                    renderNomenclature();
+                } else {
+                    content.innerHTML = '<div class="error-message">Номенклатура не найдена</div>';
+                }
+            } catch (error) {
+                content.innerHTML = `<div class="error-message">Ошибка: ${error.message}</div>`;
+            }
+        }
+
+        function renderNomenclature() {
+            const content = document.getElementById('nomenclature-content');
+            let nomenclatureHtml = '';
+
+            nomenclatureItems.forEach((item, index) => {
+                const isChecked = checkedItems.has(item);
+                const icon = isChecked ? '✅' : '☑️';
+                const checkedClass = isChecked ? 'checked' : '';
+
+                nomenclatureHtml += `
+                    <div class="nomenclature-item ${checkedClass}" onclick="toggleItem('${item}', ${index})">
+                        <span class="icon">${icon}</span>
+                        <span>${item}</span>
+                    </div>
+                `;
+            });
+
+            content.innerHTML = nomenclatureHtml;
+        }
+
+        async function loadTodayReport() {
+            const content = document.getElementById('today-report-content');
+            const today = new Date().toLocaleDateString('ru-RU');
+            document.getElementById('today-date').textContent = today;
+
+            try {
+                const response = await fetch('/api/today-report');
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Ошибка получения данных');
+                }
+
+                let html = `
+                    <div class="report-info">
+                        <h3>📊 Проверено магазинов: ${data.stores_count}</h3>
+                        <p>📅 Дата: ${data.date}</p>
+                `;
+
+                if (data.stores_count > 0) {
+                    html += `
+                        <p>📦 Всего проверок: ${data.total_checks || 0}</p>
+                        <p>✅ Товаров в наличии: ${data.total_present || 0}</p>
+                    `;
+                }
+                html += `</div>`;
+
+                if (data.stores_count > 0) {
+                    // Кнопка для скачивания Excel отчета
+                    html += `
+                        <div style="margin: 16px 0;">
+                            <button onclick="downloadTodayExcelReport()" 
+                                    style="width: 100%; padding: 16px; background: #4CAF50; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer;">
+                                📊 Скачать Excel отчет
+                            </button>
+                        </div>
+                    `;
+
+                    html += `<h3>🏪 Проверенные магазины:</h3>`;
+
+                    // Отображаем детальную информацию о каждом магазине
+                    data.stores.forEach(store => {
+                        html += `
+                            <div class="list-item" style="margin-bottom: 12px;">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                    <div style="flex: 1;">
+                                        <h4 style="margin: 0 0 4px 0; color: #2196F3;">🏬 ${store.network_name}</h4>
+                                        <p style="margin: 0 0 4px 0; font-weight: 600;">📍 Магазин №${store.number}</p>
+                                        <p style="margin: 0 0 8px 0; font-size: 14px; color: #666;">${store.address}</p>
+                                        <div style="display: flex; gap: 16px; font-size: 14px;">
+                                            <span>📦 Проверено: ${store.total_checks}</span>
+                                            <span>✅ В наличии: ${store.present_items}</span>
+                                            <span style="color: ${store.completion_rate >= 80 ? '#4CAF50' : store.completion_rate >= 50 ? '#FF9800' : '#f44336'};">
+                                                📈 ${store.completion_rate}%
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    html += `
+                        <div class="error-message">
+                            ❌ Нет проверок за сегодня
+                        </div>
+                    `;
+                }
+
+                content.innerHTML = html;
+
+                // Настраиваем главную кнопку Telegram
+                if (data.stores_count > 0) {
+                    tg.MainButton.setText('📤 Отправить отчет в Telegram');
+                    tg.MainButton.show();
+                    tg.MainButton.onClick(async () => {
+                        try {
+                            const response = await fetch('/api/send-today-report', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' }
+                            });
+                            const result = await response.json();
+
+                            if (result.success) {
+                                safeShowAlert('✅ Отчет отправлен в Telegram!');
+                            } else {
+                                safeShowAlert('❌ Ошибка отправки: ' + (result.error || 'Неизвестная ошибка'));
+                            }
+                        } catch (error) {
+                            safeShowAlert('❌ Ошибка отправки: ' + error.message);
+                        }
+                    });
+                } else {
+                    tg.MainButton.hide();
+                }
+
+            } catch (error) {
+                content.innerHTML = `
+                    <div class="error-message">
+                        ❌ Ошибка загрузки данных: ${error.message}
+                    </div>
+                `;
+                tg.MainButton.hide();
+            }
+        }
+
+        // Функция для скачивания Excel отчета за сегодня
+        async function downloadTodayExcelReport() {
+            const button = event.target;
+            const originalText = button.textContent;
+
+            try {
+                button.textContent = '⏳ Создание отчета...';
+                button.disabled = true;
+
+                console.log('Открываем Excel отчет...');
+
+                // Создаем URL для прямого доступа к файлу
+                const reportUrl = '/api/download-today-report';
+
+                // Открываем в новом окне/вкладке - это самый надежный способ для мобильных
+                const newWindow = window.open(reportUrl, '_blank');
+
+                if (newWindow) {
+                    console.log('Отчет открыт в новом окне');
+                    safeShowAlert('✅ Excel отчет открыт! Вы можете скачать его из браузера.');
+                } else {
+                    // Если popup заблокирован, показываем ссылку
+                    console.log('Popup заблокирован, создаем ссылку');
+
+                    const linkDiv = document.createElement('div');
+                    linkDiv.innerHTML = `
+                        <div style="background: #4CAF50; color: white; padding: 16px; border-radius: 8px; margin: 16px 0; text-align: center;">
+                            <p style="margin: 0 0 12px 0;">📊 Excel отчет готов!</p>
+                            <a href="${reportUrl}" target="_blank" 
+                               style="background: white; color: #4CAF50; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold;">
+                               📊 Открыть Excel отчет
+                            </a>
+                            <p style="margin: 12px 0 0 0; font-size: 12px; opacity: 0.9;">Нажмите на ссылку выше</p>
+                        </div>
+                    `;
+
+                    button.parentNode.insertBefore(linkDiv, button.nextSibling);
+
+                    // Убираем ссылку через 30 секунд
+                    setTimeout(() => {
+                        if (linkDiv.parentNode) {
+                            linkDiv.parentNode.removeChild(linkDiv);
+                        }
+                    }, 30000);
+
+                    safeShowAlert('✅ Ссылка на Excel отчет создана! Нажмите на неё ниже.');
+                }
+
+                button.textContent = originalText;
+                button.disabled = false;
+
+            } catch (error) {
+                console.error('Ошибка открытия отчета:', error);
+                safeShowAlert('❌ Ошибка: ' + error.message);
+
+                button.textContent = originalText;
+                button.disabled = false;
+            }
+        }
+
+        // Функции выбора
+        function selectRegion(id, name) {
+            currentRegion = { id, name };
+            showNetworkScreen();
+        }
+
+        function selectNetwork(id, name) {
+            currentNetwork = { id, name };
+            showStoreScreen();
+        }
+
+        function selectStore(id, name, address) {
+            currentStore = {
+                id: id,
+                name: name,
+                address: address || 'Адрес не указан'
+            };
+            showNomenclatureScreen();
+        }
+
+        // Функции номенклатуры
+        async function toggleItem(item, index) {
+            console.log(`🔄 toggleItem вызвана для товара: "${item}"`);
+
+            if (checkedItems.has(item)) {
+                // Снимаем отметку с товара
+                console.log(`❌ Снимаем отметку с товара: "${item}"`);
+                checkedItems.delete(item);
+                renderNomenclature();
+            } else {
+                // Добавляем товар в отмеченные (подсвечиваем зеленым)
+                console.log(`✅ Отмечаем товар зеленым: "${item}"`);
+                checkedItems.add(item);
+                renderNomenclature();
+
+                console.log(`💰 Запускаем проверку цен для товара: "${item}"`);
+
+                // Запускаем проверку цен
+                const priceCheckResult = await checkPriceForItem(item);
+
+                // Если проверка цены была отменена, снимаем отметку
+                if (!priceCheckResult) {
+                    console.log(`❌ Проверка цены отменена, снимаем отметку с товара: "${item}"`);
+                    checkedItems.delete(item);
+                    renderNomenclature();
+                } else {
+                    console.log(`✅ Проверка цены завершена успешно для товара: "${item}"`);
+                }
+            }
+        }
+
+        // Функция проверки цен для товара
+        async function checkPriceForItem(productName) {
+            console.log(`💰 Начинаем проверку цен для товара: "${productName}"`);
+
+            try {
+                // Проверяем, что у нас есть данные о сети
+                if (!currentNetwork || !currentNetwork.id) {
+                    console.error('❌ Нет данных о текущей сети');
+                    alert('❌ Ошибка: нет данных о сети. Товар снят с отметки.');
+                    return false;
+                }
+
+                console.log(`🌐 Запрашиваем последнюю цену для товара "${productName}" в сети ${currentNetwork.id}`);
+
+                // Получаем последнюю цену товара в сети
+                const response = await fetch('/api/get-last-price', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        network_id: currentNetwork.id,
+                        product_name: productName
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                console.log(`📊 Ответ сервера для товара "${productName}":`, data);
+
+                if (data.success && data.price_data) {
+                    // Есть последняя цена в сети - предлагаем подтвердить
+                    console.log(`💰 Найдена последняя цена для товара "${productName}"`);
+                    const priceData = data.price_data;
+                    const promoText = priceData.has_promo && priceData.promo_price ?
+                        `\n🔥 Акционная: ${priceData.promo_price} руб.` : '';
+
+                    const message = `💰 Последняя цена в сети:\n` +
+                        `🏪 Магазин №${priceData.store_number} (${priceData.check_date})\n` +
+                        `🏷️ Обычная: ${priceData.regular_price} руб.${promoText}\n\n` +
+                        `Подтвердить эту цену для товара "${productName}"?`;
+
+                    const confirmPrice = confirm(message);
+                    console.log(`🤔 Пользователь ${confirmPrice ? 'подтвердил' : 'отклонил'} существующую цену`);
+
+                    if (confirmPrice) {
+                        // Подтверждаем существующую цену, переходим к акционной цене
+                        const promoResult = await askPromoPrice(productName, priceData.regular_price, priceData.promo_price, priceData.has_promo);
+                        if (promoResult === null) {
+                            console.log(`❌ Пользователь отменил ввод акционной цены для товара "${productName}"`);
+                            return false;
+                        }
+
+                        // Переходим к остаткам
+                        const stockResult = await askStockQuantity(productName);
+                        if (stockResult === null) {
+                            console.log(`❌ Пользователь отменил ввод остатков для товара "${productName}"`);
+                            return false;
+                        }
+
+                        // Сохраняем все данные
+                        console.log(`💾 Сохраняем данные для товара "${productName}"`);
+                        await savePriceData(productName, priceData.regular_price, promoResult.promoPrice, promoResult.hasPromo, stockResult);
+                        return true;
+                    } else {
+                        // Запрашиваем новую цену
+                        console.log(`✏️ Запрашиваем новую цену для товара "${productName}"`);
+                        return await requestNewPrice(productName);
+                    }
+                } else {
+                    // Нет данных о цене - запрашиваем новую
+                    console.log(`📝 Нет данных о цене для товара "${productName}", запрашиваем новую`);
+                    return await requestNewPrice(productName);
+                }
+            } catch (error) {
+                console.error(`❌ Ошибка проверки цены для товара "${productName}":`, error);
+                alert(`❌ Ошибка при проверке цены: ${error.message}. Товар снят с отметки.`);
+                return false;
+            }
+        }
+
+        // Функция запроса новой цены
+        async function requestNewPrice(productName) {
+            console.log(`✏️ Запрашиваем новую цену для товара "${productName}"`);
+
+            const regularPrice = prompt(`💰 Введите обычную цену для "${productName}" (в рублях):`);
+
+            // Если пользователь отменил ввод цены
+            if (regularPrice === null) {
+                console.log(`❌ Пользователь отменил ввод обычной цены для товара "${productName}"`);
+                return false;
+            }
+
+            // Валидация цены
+            if (!regularPrice || regularPrice.trim() === '' || isNaN(regularPrice) || parseFloat(regularPrice) <= 0) {
+                console.log(`❌ Некорректная цена "${regularPrice}" для товара "${productName}"`);
+                alert('❌ Некорректная цена. Товар снят с отметки.');
+                return false;
+            }
+
+            const regPrice = parseFloat(regularPrice);
+            console.log(`💰 Обычная цена для товара "${productName}": ${regPrice} руб.`);
+
+            // Переходим к акционной цене
+            console.log(`🔥 Переходим к акционной цене для товара "${productName}"`);
+            const promoResult = await askPromoPrice(productName, regPrice);
+            if (promoResult === null) {
+                console.log(`❌ Пользователь отменил ввод акционной цены для товара "${productName}"`);
+                return false;
+            }
+
+            // Переходим к остаткам
+            console.log(`📦 Переходим к остаткам для товара "${productName}"`);
+            const stockResult = await askStockQuantity(productName);
+            if (stockResult === null) {
+                console.log(`❌ Пользователь отменил ввод остатков для товара "${productName}"`);
+                return false;
+            }
+
+            // Сохраняем все данные
+            console.log(`💾 Сохраняем все данные для товара "${productName}"`);
+            await savePriceData(productName, regPrice, promoResult.promoPrice, promoResult.hasPromo, stockResult);
+            return true;
+        }
+
+        // Функция обработки акционной цены
+        async function askPromoPrice(productName, regularPrice, existingPromoPrice = null, existingHasPromo = false) {
+            console.log(`🔥 Обрабатываем акционную цену для товара "${productName}" (обычная цена: ${regularPrice})`);
+
+            // Если есть существующая акционная цена, предлагаем её
+            if (existingHasPromo && existingPromoPrice) {
+                console.log(`🔥 Найдена существующая акционная цена: ${existingPromoPrice} руб.`);
+                const confirmExistingPromo = confirm(`🔥 Подтвердить акционную цену ${existingPromoPrice} руб. для "${productName}"?`);
+                if (confirmExistingPromo) {
+                    console.log(`✅ Пользователь подтвердил существующую акционную цену`);
+                    return { promoPrice: existingPromoPrice, hasPromo: true };
+                }
+                console.log(`❌ Пользователь отклонил существующую акционную цену`);
+            }
+
+            // Спрашиваем, есть ли акция
+            const hasPromo = confirm(`🔥 Есть ли акционная цена на "${productName}"?`);
+            console.log(`🔥 Пользователь ${hasPromo ? 'подтвердил' : 'отклонил'} наличие акции`);
+
+            if (!hasPromo) {
+                return { promoPrice: null, hasPromo: false };
+            }
+
+            // Запрашиваем акционную цену
+            const promoPrice = prompt(`🔥 Введите акционную цену для "${productName}" (в рублях):`);
+
+            // Если пользователь отменил
+            if (promoPrice === null) {
+                console.log(`❌ Пользователь отменил ввод акционной цены`);
+                return null;
+            }
+
+            // Валидация акционной цены
+            if (!promoPrice || promoPrice.trim() === '' || isNaN(promoPrice) || parseFloat(promoPrice) <= 0) {
+                console.log(`❌ Некорректная акционная цена: "${promoPrice}"`);
+                alert('❌ Некорректная акционная цена. Товар снят с отметки.');
+                return null;
+            }
+
+            const promoPriceFloat = parseFloat(promoPrice);
+            console.log(`🔥 Введена акционная цена: ${promoPriceFloat} руб.`);
+
+            // Проверяем, что акционная цена меньше обычной
+            if (promoPriceFloat >= regularPrice) {
+                console.log(`❌ Акционная цена (${promoPriceFloat}) >= обычной (${regularPrice})`);
+                alert(`❌ Акционная цена (${promoPriceFloat}) не может быть больше или равна обычной (${regularPrice}). Товар снят с отметки.`);
+                return null;
+            }
+
+            console.log(`✅ Акционная цена валидна: ${promoPriceFloat} руб.`);
+            return { promoPrice: promoPriceFloat, hasPromo: true };
+        }
+
+        // Функция обработки остатков
+        async function askStockQuantity(productName) {
+            console.log(`📦 Запрашиваем остатки для товара "${productName}"`);
+
+            const stockQuantity = prompt(`📦 Введите остатки товара "${productName}" (штук):`);
+
+            // Если пользователь отменил
+            if (stockQuantity === null) {
+                console.log(`❌ Пользователь отменил ввод остатков`);
+                return null;
+            }
+
+            // Если пользователь оставил пустым - считаем как пропуск (разрешаем)
+            if (stockQuantity === '' || stockQuantity.trim() === '') {
+                console.log(`⏭️ Пользователь пропустил ввод остатков`);
+                return null; // null означает "не указано"
+            }
+
+            // Валидация остатков
+            if (isNaN(stockQuantity) || parseInt(stockQuantity) < 0) {
+                console.log(`❌ Некорректные остатки: "${stockQuantity}"`);
+                alert('❌ Некорректное количество остатков. Товар снят с отметки.');
+                return null;
+            }
+
+            const stockQty = parseInt(stockQuantity);
+            console.log(`📦 Введены остатки: ${stockQty} шт.`);
+            return stockQty;
+        }
+
+        // Функция сохранения данных о цене и остатках
+        async function savePriceData(productName, regularPrice, promoPrice, hasPromo, stockQuantity) {
+            console.log(`💾 Сохраняем данные для товара "${productName}":`, {
+                regularPrice,
+                promoPrice,
+                hasPromo,
+                stockQuantity,
+                store_id: currentStore?.id
+            });
+
+            try {
+                // Проверяем, что у нас есть данные о магазине
+                if (!currentStore || !currentStore.id) {
+                    throw new Error('Нет данных о текущем магазине');
+                }
+
+                const requestData = {
+                    store_id: currentStore.id,
+                    product_name: productName,
+                    regular_price: regularPrice,
+                    promo_price: promoPrice,
+                    has_promo: hasPromo || false,
+                    stock_quantity: stockQuantity
+                };
+
+                console.log(`🌐 Отправляем данные на сервер:`, requestData);
+
+                const response = await fetch('/api/save-price', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                console.log(`📊 Ответ сервера:`, data);
+
+                if (data.success) {
+                    console.log(`✅ Цена и остатки сохранены для товара: ${productName}`);
+
+                    // Показываем пользователю что сохранено
+                    let savedInfo = `✅ Сохранено для "${productName}":\n💰 Цена: ${regularPrice} руб.`;
+                    if (hasPromo && promoPrice) {
+                        savedInfo += `\n🔥 Акция: ${promoPrice} руб.`;
+                    }
+                    if (stockQuantity !== null && stockQuantity !== undefined) {
+                        savedInfo += `\n📦 Остатки: ${stockQuantity} шт.`;
+                    } else {
+                        savedInfo += `\n📦 Остатки: не указаны`;
+                    }
+
+                    console.log(`📢 Показываем уведомление пользователю:`, savedInfo);
+
+                    // Показываем уведомление
+                    safeShowAlert(savedInfo);
+                } else {
+                    console.error('❌ Ошибка сохранения:', data.error);
+                    throw new Error(data.error || 'Неизвестная ошибка сервера');
+                }
+            } catch (error) {
+                console.error(`❌ Ошибка сохранения для товара "${productName}":`, error);
+                alert(`❌ Ошибка сохранения: ${error.message}`);
+                throw error; // Пробрасываем ошибку дальше
+            }
+        }
+
+        async function saveProgress() {
+            try {
+                const response = await fetch('/api/save-progress', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        store_id: currentStore.id,
+                        checked_items: Array.from(checkedItems)
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    safeShowAlert('Прогресс сохранен!');
+                    showStoreScreen();
+                } else {
+                    safeShowAlert('Ошибка сохранения: ' + data.error);
+                }
+            } catch (error) {
+                safeShowAlert('Ошибка сохранения: ' + error.message);
+            }
+        }
+
+        let isSending = false;
+
+        function debugLog(message, level = 'INFO') {
+            const timestamp = new Date().toLocaleTimeString();
+            console.log(`[${timestamp}] ${level}: ${message}`);
+
+            // Также показываем на странице
+            const debugDiv = document.getElementById('debug-log');
+            if (debugDiv) {
+                debugDiv.style.display = 'block';
+                debugDiv.innerHTML += `[${timestamp}] ${level}: ${message}<br>`;
+                debugDiv.scrollTop = debugDiv.scrollHeight;
+            }
+        }
+
+        async function finalSaveAndSend() {
+            debugLog('🖱️ Кнопка "Сохранить и отправить" нажата', 'CLICK');
+
+            if (isSending) {
+                debugLog('⚠️ Кнопка уже в процессе отправки, игнорируем', 'WARNING');
+                return;
+            }
+            if (!currentStore || nomenclatureItems.length === 0) {
+                debugLog('❌ Нет данных для отправки', 'ERROR');
+                safeShowAlert('Нет данных для отправки');
+                return;
+            }
+
+            debugLog(`📊 Данные для отправки: магазин=${currentStore.name}, товаров=${nomenclatureItems.length}, отмечено=${checkedItems.size}`, 'DATA');
+
+            isSending = true;
+
+            // Меняем текст кнопки
+            const sendButton = document.querySelector('.send-button');
+            const originalText = sendButton.textContent;
+            sendButton.textContent = '⏳ Отправка...';
+            sendButton.disabled = true;
+
+            debugLog('🔒 Кнопка заблокирована, начинаем отправку', 'STATUS');
+
+            try {
+                // Сначала сохраняем данные
+                debugLog('📤 Отправляем данные на /api/save-and-send', 'REQUEST');
+
+                const savePayload = {
+                    store_id: currentStore.id,
+                    store_name: currentStore.name,
+                    checked_items: Array.from(checkedItems),
+                    total_items: nomenclatureItems.length
+                };
+
+                debugLog(`📋 Payload: ${JSON.stringify(savePayload)}`, 'DATA');
+
+                const saveResponse = await fetch('/api/save-and-send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(savePayload)
+                });
+
+                debugLog(`📥 Ответ от /api/save-and-send: HTTP ${saveResponse.status}`, 'RESPONSE');
+
+                const saveData = await saveResponse.json();
+                debugLog(`📄 Данные ответа: ${JSON.stringify(saveData)}`, 'DATA');
+
+                if (saveData.success) {
+                    debugLog('✅ Сохранение успешно, отправляем в Telegram', 'SUCCESS');
+
+                    // Получаем данные от пользователя
+                    const inspectorName = document.getElementById('inspector-name').value.trim();
+                    const userComment = document.getElementById('report-comment').value.trim();
+
+                    // Проверяем обязательные поля
+                    if (!inspectorName) {
+                        alert('❌ Пожалуйста, укажите ваше ФИО');
+                        return;
+                    }
+
+                    // Создаем подробное сообщение
+                    let telegramMessage = `📋 Отчет по проверке номенклатуры\n\n`;
+                    telegramMessage += `🏪 Магазин: ${currentStore.name}\n`;
+                    telegramMessage += `📍 Адрес: ${currentStore.address}\n`;
+                    telegramMessage += `🆔 ID магазина: ${currentStore.id}\n`;
+                    telegramMessage += `📅 Дата проверки: ${new Date().toLocaleDateString('ru-RU')}\n`;
+                    telegramMessage += `👤 Проверил: ${inspectorName}\n`;
+                    telegramMessage += `📊 Результат: ${checkedItems.size} из ${nomenclatureItems.length} товаров в наличии`;
+
+                    if (userComment) {
+                        telegramMessage += `\n\n💬 Комментарий: ${userComment}`;
+                    }
+
+                    debugLog('📤 Создаем Excel отчет и отправляем в Telegram', 'REQUEST');
+
+                    const telegramResponse = await fetch('/api/send-to-telegram', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            message: telegramMessage,
+                            store_id: currentStore.id,
+                            store_name: currentStore.name,
+                            inspector_name: inspectorName,
+                            comment: userComment
+                        })
+                    });
+
+                    debugLog(`📥 Ответ от Telegram API: HTTP ${telegramResponse.status}`, 'RESPONSE');
+
+                    const telegramData = await telegramResponse.json();
+                    debugLog(`📄 Telegram данные: ${JSON.stringify(telegramData)}`, 'DATA');
+
+                    if (telegramData.success) {
+                        debugLog('✅ Все операции завершены успешно', 'SUCCESS');
+                        const reportFile = telegramData.report_file || 'отчет';
+                        const successMessage = `✅ Данные сохранены!\n📊 Excel отчет создан: ${reportFile.split('/').pop()}\n📤 Готов к отправке в группу!`;
+
+                        // Показываем уведомление об успехе
+                        safeShowAlert(successMessage);
+                    } else {
+                        debugLog('⚠️ Telegram отправка не удалась', 'WARNING');
+                        safeShowAlert('⚠️ Данные сохранены, но не отправлены в группу');
+                    }
+
+                    debugLog('🏠 Возвращаемся в главное меню', 'NAVIGATION');
+                    showMainScreen();
+                } else {
+                    debugLog(`❌ Ошибка сохранения: ${saveData.error}`, 'ERROR');
+                    safeShowAlert('❌ Ошибка сохранения: ' + saveData.error);
+                }
+            } catch (error) {
+                debugLog(`💥 Исключение: ${error.message}`, 'ERROR');
+                debugLog(`📍 Stack trace: ${error.stack}`, 'ERROR');
+                // Используем обычный alert для ошибок
+                alert('❌ Ошибка: ' + error.message);
+            } finally {
+                // Восстанавливаем кнопку
+                debugLog('🔓 Разблокируем кнопку', 'STATUS');
+                isSending = false;
+                sendButton.textContent = originalText;
+                sendButton.disabled = false;
+            }
+        }
+
+        // Инициализация
+        console.log('Telegram Web App загружен');
+
+        if (tg.sendData) {
+            tg.sendData(JSON.stringify({
+                action: 'app_ready',
+                timestamp: Date.now()
+            }));
+        }
+
+        // Функции для работы со сканером штрих-кода
+        function openBarcodeScanner() {
+            const modal = document.getElementById('scanner-modal');
+            modal.style.display = 'flex';
+
+            // Очищаем поле ввода
+            document.getElementById('manual-barcode').value = '';
+
+            // Сбрасываем состояние кнопок
+            document.getElementById('start-scan-btn').style.display = 'inline-block';
+            document.getElementById('stop-scan-btn').style.display = 'none';
+
+            // Обновляем статус
+            document.getElementById('scanner-status').textContent = 'Нажмите "Начать сканирование" или введите код вручную';
+        }
+
+        function closeBarcodeScanner() {
+            const modal = document.getElementById('scanner-modal');
+
+            // Останавливаем сканирование
+            stopScanning();
+
+            // Закрываем модальное окно
+            modal.style.display = 'none';
+
+            // Очищаем поле ввода
+            document.getElementById('manual-barcode').value = '';
+        }
+
+        function startScanning() {
+            const status = document.getElementById('scanner-status');
+            const startBtn = document.getElementById('start-scan-btn');
+            const stopBtn = document.getElementById('stop-scan-btn');
+
+            status.textContent = '🔄 Инициализация камеры...';
+            startBtn.style.display = 'none';
+            stopBtn.style.display = 'inline-block';
+
+            // Инициализируем QuaggaJS
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: document.querySelector('#scanner-video-container'),
+                    constraints: {
+                        width: 400,
+                        height: 300,
+                        facingMode: "environment" // Задняя камера
+                    }
+                },
+                locator: {
+                    patchSize: "medium",
+                    halfSample: true
+                },
+                numOfWorkers: 2,
+                frequency: 10,
+                decoder: {
+                    readers: [
+                        "code_128_reader",
+                        "ean_reader",
+                        "ean_8_reader",
+                        "code_39_reader",
+                        "code_39_vin_reader",
+                        "codabar_reader",
+                        "upc_reader",
+                        "upc_e_reader",
+                        "i2of5_reader"
+                    ]
+                },
+                locate: true
+            }, function (err) {
+                if (err) {
+                    console.error('Ошибка инициализации QuaggaJS:', err);
+                    status.textContent = '❌ Не удалось получить доступ к камере. Используйте ручной ввод.';
+                    startBtn.style.display = 'inline-block';
+                    stopBtn.style.display = 'none';
+                    return;
+                }
+
+                console.log("QuaggaJS инициализирован успешно");
+                status.textContent = '📷 Камера активна. Наведите на штрих-код';
+                isScanning = true;
+                Quagga.start();
+            });
+
+            // Обработчик успешного сканирования
+            Quagga.onDetected(function (result) {
+                const code = result.codeResult.code;
+                console.log('Отсканирован штрих-код:', code);
+
+                // Останавливаем сканирование
+                stopScanning();
+
+                // Ищем товар
+                const foundProduct = findProductByBarcode(code);
+
+                if (foundProduct) {
+                    closeBarcodeScanner();
+                    showFoundProduct(foundProduct, code);
+                    scrollToProduct(foundProduct);
+                } else {
+                    // Показываем код в поле ввода для ручного поиска
+                    document.getElementById('manual-barcode').value = code;
+                    status.textContent = `📷 Отсканирован код: ${code}. Товар не найден автоматически. Попробуйте ручной поиск.`;
+                    startBtn.style.display = 'inline-block';
+                    stopBtn.style.display = 'none';
+                }
+            });
+        }
+
+        function stopScanning() {
+            if (isScanning) {
+                Quagga.stop();
+                isScanning = false;
+
+                const startBtn = document.getElementById('start-scan-btn');
+                const stopBtn = document.getElementById('stop-scan-btn');
+                const status = document.getElementById('scanner-status');
+
+                startBtn.style.display = 'inline-block';
+                stopBtn.style.display = 'none';
+                status.textContent = 'Сканирование остановлено. Нажмите "Начать сканирование" для повтора.';
+            }
+        }
+
+        function searchByBarcode() {
+            const barcodeInput = document.getElementById('manual-barcode');
+            const barcode = barcodeInput.value.trim();
+
+            if (!barcode) {
+                alert('❌ Введите штрих-код');
+                return;
+            }
+
+            // Ищем товар по штрих-коду в номенклатуре
+            const foundProduct = findProductByBarcode(barcode);
+
+            if (foundProduct) {
+                // Закрываем сканер
+                closeBarcodeScanner();
+
+                // Показываем найденный товар
+                showFoundProduct(foundProduct, barcode);
+
+                // Прокручиваем к товару в списке
+                scrollToProduct(foundProduct);
+
+            } else {
+                alert(`❌ Товар с штрих-кодом "${barcode}" не найден в номенклатуре магазина`);
+            }
+        }
+
+        function findProductByBarcode(barcode) {
+            const searchTerm = barcode.toLowerCase();
+
+            // Специальные коды для тестирования
+            const testCodes = {
+                '123': 'молоко',
+                '456': 'хлеб',
+                '789': 'масло',
+                '101': 'сыр'
+            };
+
+            // Если это тестовый код, ищем по соответствующему слову
+            const searchWord = testCodes[barcode] || searchTerm;
+
+            return nomenclatureItems.find(item =>
+                item.toLowerCase().includes(searchWord) ||
+                item.toLowerCase().includes(searchTerm) ||
+                (barcode.length >= 3 && item.toLowerCase().includes(barcode.slice(-3)))
+            );
+        }
+
+        function showFoundProduct(productName, barcode) {
+            const resultDiv = document.getElementById('barcode-result');
+            const productDiv = document.getElementById('found-product');
+
+            productDiv.innerHTML = `
+                <div style="margin: 8px 0; padding: 10px; background: #f0f8ff; border-radius: 5px;">
+                    <strong>🎯 ${productName}</strong><br>
+                    <small>Найден по коду: ${barcode}</small>
+                </div>
+                <div style="margin-top: 10px;">
+                    <button onclick="markProductFound('${productName.replace(/'/g, "\\'")}'); hideBarcodeResult();" 
+                            style="background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-right: 10px; font-size: 14px;">
+                        ✅ Отметить как найден
+                    </button>
+                    <button onclick="hideBarcodeResult();" 
+                            style="background: #666; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;">
+                        ❌ Закрыть
+                    </button>
+                </div>
+            `;
+
+            resultDiv.style.display = 'block';
+
+            // Автоматически скрываем через 15 секунд
+            setTimeout(() => {
+                hideBarcodeResult();
+            }, 15000);
+        }
+
+        function markProductFound(productName) {
+            // Добавляем товар в отмеченные
+            checkedItems.add(productName);
+            renderNomenclature();
+
+            // Показываем уведомление
+            alert(`✅ Товар "${productName}" отмечен как найденный`);
+        }
+
+        function hideBarcodeResult() {
+            document.getElementById('barcode-result').style.display = 'none';
+        }
+
+        // Функции отладки
+        function toggleDebugMode() {
+            debugMode = !debugMode;
+            const debugLog = document.getElementById('debug-log');
+            if (debugMode) {
+                debugLog.style.display = 'block';
+                addDebugLog('🔍 Отладочный режим включен');
+            } else {
+                debugLog.style.display = 'none';
+            }
+        }
+
+        function addDebugLog(message) {
+            if (!debugMode) return;
+
+            const debugContent = document.getElementById('debug-content');
+            const timestamp = new Date().toLocaleTimeString();
+            debugContent.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+
+            // Автоскролл вниз
+            const debugLog = document.getElementById('debug-log');
+            debugLog.scrollTop = debugLog.scrollHeight;
+        }
+
+        // Переопределяем console.log для отладки
+        const originalConsoleLog = console.log;
+        console.log = function (...args) {
+            originalConsoleLog.apply(console, args);
+            if (debugMode) {
+                addDebugLog(args.join(' '));
+            }
+        };
+
+        function scrollToProduct(productName) {
+            // Ищем элемент товара в списке и прокручиваем к нему
+            const nomenclatureItems = document.querySelectorAll('.nomenclature-item');
+
+            nomenclatureItems.forEach(item => {
+                const itemText = item.textContent || item.innerText;
+                if (itemText.includes(productName)) {
+                    item.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+
+                    // Подсвечиваем найденный товар
+                    item.style.border = '3px solid #FF6B35';
+                    item.style.boxShadow = '0 0 10px rgba(255, 107, 53, 0.5)';
+
+                    // Убираем подсветку через 3 секунды
+                    setTimeout(() => {
+                        item.style.border = '';
+                        item.style.boxShadow = '';
+                    }, 3000);
+                }
+            });
+        }
+
+        // Функция быстрого поиска
+        function quickSearch(code) {
+            document.getElementById('manual-barcode').value = code;
+            searchByBarcode();
+        }
+
+        // Обработка нажатия Enter в поле ввода штрих-кода
+        document.addEventListener('DOMContentLoaded', function () {
+            const manualBarcodeInput = document.getElementById('manual-barcode');
+            if (manualBarcodeInput) {
+                manualBarcodeInput.addEventListener('keypress', function (e) {
+                    if (e.key === 'Enter') {
+                        searchByBarcode();
+                    }
+                });
+            }
+        });
+
+        // Регистрация Service Worker для PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(function (registration) {
+                        console.log('Service Worker зарегистрирован:', registration.scope);
+
+                        // Показываем кнопку установки PWA
+                        showInstallPrompt();
+                    })
+                    .catch(function (error) {
+                        console.log('Ошибка регистрации Service Worker:', error);
+                    });
+            });
+        }
+
+        // Обработка установки PWA
+        let deferredPrompt;
+        let installButton = null;
+
+        // Создаем кнопку установки сразу для мобильных устройств
+        function createInstallButton() {
+            if (installButton) return;
+
+            installButton = document.createElement('button');
+            installButton.id = 'install-pwa-btn';
+            installButton.innerHTML = '📱 Установить приложение';
+            installButton.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 25px;
+                padding: 12px 20px;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+                z-index: 1000;
+                animation: pulse 2s infinite;
+                display: block;
+            `;
+
+            installButton.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    // Для Chrome/Edge
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    console.log('PWA установка:', outcome);
+                    if (outcome === 'accepted') {
+                        hideInstallButton();
+                    }
+                } else {
+                    // Для других браузеров показываем инструкцию
+                    showInstallInstructions();
+                }
+            });
+
+            document.body.appendChild(installButton);
+
+            // Добавляем анимацию пульсации
+            if (!document.getElementById('pulse-animation')) {
+                const style = document.createElement('style');
+                style.id = 'pulse-animation';
+                style.textContent = `
+                    @keyframes pulse {
+                        0% { transform: scale(1); }
+                        50% { transform: scale(1.05); }
+                        100% { transform: scale(1); }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+        }
+
+        function hideInstallButton() {
+            if (installButton) {
+                installButton.remove();
+                installButton = null;
+            }
+        }
+
+        function showInstallInstructions() {
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            const isAndroid = /Android/.test(navigator.userAgent);
+
+            let instructions = '';
+            if (isIOS) {
+                instructions = `
+                    📱 Для установки на iPhone/iPad:
+                    1. Нажмите кнопку "Поделиться" ⬆️
+                    2. Выберите "На экран «Домой»"
+                    3. Нажмите "Добавить"
+                `;
+            } else if (isAndroid) {
+                instructions = `
+                    📱 Для установки на Android:
+                    1. Откройте меню браузера (⋮)
+                    2. Выберите "Добавить на главный экран"
+                    3. Подтвердите установку
+                `;
+            } else {
+                instructions = `
+                    💻 Для установки на компьютере:
+                    1. Найдите иконку установки в адресной строке
+                    2. Или используйте меню браузера
+                    3. Выберите "Установить приложение"
+                `;
+            }
+
+            alert(instructions);
+        }
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            console.log('PWA: Событие beforeinstallprompt');
+            e.preventDefault();
+            deferredPrompt = e;
+            createInstallButton();
+        });
+
+        // Показываем кнопку через 3 секунды, даже если нет события beforeinstallprompt
+        setTimeout(() => {
+            if (!installButton && !window.matchMedia('(display-mode: standalone)').matches) {
+                createInstallButton();
+            }
+        }, 3000);
+
+        // Обработка успешной установки PWA
+        window.addEventListener('appinstalled', (evt) => {
+            console.log('PWA успешно установлено');
+            const installBtn = document.getElementById('install-pwa-btn');
+            if (installBtn) {
+                installBtn.remove();
+            }
+        });
+    </script>
+</body>
+
+</html>
