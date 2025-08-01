@@ -370,58 +370,12 @@ def send_report_to_telegram(report_filename, message, comment):
         return False
 
 def get_store_addresses_from_excel():
-    """Получает словарь адресов магазинов из Excel файлов"""
+    """Получает словарь адресов магазинов из Excel файлов (демо версия)"""
     try:
-        import pandas as pd
-        import os
-        import sqlite3
-        
-        store_addresses = {}
-        
-        # Получаем соответствие номер магазина -> ID из базы данных для сети Розница
-        conn = sqlite3.connect('bot_database.db')
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT s.id, s.number, s.address 
-            FROM stores s 
-            JOIN networks n ON s.network_id = n.id 
-            WHERE n.name = 'Розница'
-        """)
-        stores_data = cursor.fetchall()
-        conn.close()
-        
-        # Проверяем файл address.xlsx
-        if os.path.exists('address.xlsx'):
-            try:
-                df_addresses = pd.read_excel('address.xlsx')
-                
-                # Создаем словарь: название контрагента -> адрес
-                contractor_to_address = {}
-                for _, row in df_addresses.iterrows():
-                    contractor_name = str(row.iloc[0]).strip()  # Первая колонка - контрагент
-                    address = str(row.iloc[1]).strip()         # Вторая колонка - адрес
-                    
-                    if contractor_name != 'nan' and address != 'nan':
-                        contractor_to_address[contractor_name] = address
-                
-                # Сопоставляем с магазинами в базе данных
-                for store_id, store_number, db_address in stores_data:
-                    # store_number в базе данных - это название контрагента
-                    if store_number in contractor_to_address:
-                        excel_address = contractor_to_address[store_number]
-                        store_addresses[store_id] = excel_address
-                    else:
-                        # Если не найдено в Excel, используем адрес из БД
-                        store_addresses[store_id] = db_address
-                        
-            except Exception as e:
-                logging.error(f"Ошибка чтения address.xlsx: {e}")
-        else:
-            # Если файл address.xlsx не найден, используем адреса из БД
-            for store_id, store_number, db_address in stores_data:
-                store_addresses[store_id] = db_address
-        
-        return store_addresses
+        # В демо режиме возвращаем пустой словарь
+        # В реальном приложении здесь была бы работа с Excel файлами
+        logging.info("Демо режим: адреса из Excel недоступны")
+        return {}
             
     except Exception as e:
         logging.error(f"Ошибка получения адресов из Excel: {e}")

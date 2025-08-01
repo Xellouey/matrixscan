@@ -1,7 +1,4 @@
-# Web App Dependencies - Vercel Compatible
+# Web App Dependencies - Minimal for Vercel
 Flask==2.3.3
 python-dotenv==1.0.0
-pandas==1.5.3
-openpyxl==3.1.2
 requests==2.31.0
-numpy==1.24.3
