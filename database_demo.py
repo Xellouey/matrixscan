@@ -142,9 +142,7 @@ def get_price_check(store_id: int, product_name: str, check_date: date):
 def create_store_report(store_id: int, report_date: date, store_name: str = None):
     """Создает Excel отчет для магазина (демо версия)."""
     try:
-        import pandas as pd
         from datetime import datetime
-        import tempfile
         
         # Получаем данные проверки из памяти
         date_str = report_date.isoformat()
@@ -155,33 +153,54 @@ def create_store_report(store_id: int, report_date: date, store_name: str = None
             logging.warning(f"Нет данных для отчета магазина {store_id} за {report_date}")
             return None
         
-        # Создаем DataFrame
-        df_data = []
-        for product, is_present in date_checks.items():
-            price_key = f"{store_id}_{product}_{date_str}"
-            price_data = price_checks.get(price_key, {})
+        # Пытаемся создать Excel отчет
+        try:
+            import pandas as pd
             
-            df_data.append({
-                'Товар': product,
-                'Наличие': 'Да' if is_present else 'Нет',
-                'Обычная цена': price_data.get('regular_price', ''),
-                'Акционная цена': price_data.get('promo_price', ''),
-                'Есть акция': 'Да' if price_data.get('has_promo') else 'Нет',
-                'Остаток': price_data.get('stock_quantity', '')
-            })
-        
-        df = pd.DataFrame(df_data)
-        
-        # Создаем временный файл
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"/tmp/Отчет_магазин_{store_id}_{report_date.strftime('%Y-%m-%d')}_{timestamp}.xlsx"
-        
-        # Сохраняем в Excel
-        with pd.ExcelWriter(filename, engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name='Отчет', index=False)
-        
-        logging.info(f"Создан отчет: {filename}")
-        return filename
+            # Создаем DataFrame
+            df_data = []
+            for product, is_present in date_checks.items():
+                price_key = f"{store_id}_{product}_{date_str}"
+                price_data = price_checks.get(price_key, {})
+                
+                df_data.append({
+                    'Товар': product,
+                    'Наличие': 'Да' if is_present else 'Нет',
+                    'Обычная цена': price_data.get('regular_price', ''),
+                    'Акционная цена': price_data.get('promo_price', ''),
+                    'Есть акция': 'Да' if price_data.get('has_promo') else 'Нет',
+                    'Остаток': price_data.get('stock_quantity', '')
+                })
+            
+            df = pd.DataFrame(df_data)
+            
+            # Создаем временный файл
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"/tmp/Отчет_магазин_{store_id}_{report_date.strftime('%Y-%m-%d')}_{timestamp}.xlsx"
+            
+            # Сохраняем в Excel
+            with pd.ExcelWriter(filename, engine='openpyxl') as writer:
+                df.to_excel(writer, sheet_name='Отчет', index=False)
+            
+            logging.info(f"Создан Excel отчет: {filename}")
+            return filename
+            
+        except ImportError:
+            # Если pandas недоступен, создаем простой текстовый отчет
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"/tmp/Отчет_магазин_{store_id}_{report_date.strftime('%Y-%m-%d')}_{timestamp}.txt"
+            
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(f"Отчет по магазину {store_id}\n")
+                f.write(f"Дата: {report_date.strftime('%d.%m.%Y')}\n")
+                f.write("=" * 50 + "\n\n")
+                
+                for product, is_present in date_checks.items():
+                    status = "Да" if is_present else "Нет"
+                    f.write(f"{product}: {status}\n")
+            
+            logging.info(f"Создан текстовый отчет: {filename}")
+            return filename
         
     except Exception as e:
         logging.error(f"Ошибка создания отчета: {e}")

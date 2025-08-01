@@ -9,6 +9,13 @@ from flask import Flask, render_template_string, jsonify, request, send_from_dir
 import os
 import json
 from datetime import datetime, date
+import logging
+from dotenv import load_dotenv
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Используем демо базу данных для Vercel
 try:
     from database_demo import get_checked_stores_for_date, get_all_regions, get_networks_by_region, get_stores_by_network, get_last_price_in_network, save_price_check, get_price_check
@@ -16,18 +23,12 @@ try:
 except ImportError:
     from database import get_checked_stores_for_date, get_all_regions, get_networks_by_region, get_stores_by_network, get_last_price_in_network, save_price_check, get_price_check
     logger.info("Используется локальная база данных")
-import logging
-from dotenv import load_dotenv
 
 # Загружаем переменные окружения
 load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
-
-# Настройка логирования
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 @app.route('/')
 def index():
