@@ -1173,8 +1173,7 @@ def save_price_api():
             regular_price=data.get('regular_price'),
             promo_price=data.get('promo_price'),
             has_promo=data.get('has_promo', False),
-            stock_quantity=data.get('stock_quantity'),
-            price_notes=data.get('price_notes')
+            stock_quantity=data.get('stock_quantity')
         )
         
         if result:

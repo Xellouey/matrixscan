@@ -8,6 +8,18 @@
   ],
   "routes": [
     {
+      "src": "/manifest.json",
+      "dest": "app.py"
+    },
+    {
+      "src": "/sw.js",
+      "dest": "app.py"
+    },
+    {
+      "src": "/icon-(.*).png",
+      "dest": "app.py"
+    },
+    {
       "src": "/(.*)",
       "dest": "app.py"
     }

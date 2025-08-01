@@ -195,5 +195,34 @@ conn = None
 cursor = None
 
 def get_last_price_in_network(network_id: int, product_name: str):
-    """Заглушка для совместимости."""
-    return None
+    """Получает последнюю цену товара в сети (демо версия)."""
+    try:
+        from datetime import date
+        
+        # Ищем последнюю цену в наших данных
+        today = date.today()
+        date_str = today.isoformat()
+        
+        # Получаем все магазины сети
+        network_stores = [store_id for store_id, number, address, net_id in DEMO_STORES if net_id == network_id]
+        
+        # Ищем последнюю цену среди всех магазинов сети
+        for store_id in network_stores:
+            price_key = f"{store_id}_{product_name}_{date_str}"
+            if price_key in price_checks:
+                price_data = price_checks[price_key]
+                store_info = next((s for s in DEMO_STORES if s[0] == store_id), None)
+                
+                return {
+                    'regular_price': price_data.get('regular_price'),
+                    'promo_price': price_data.get('promo_price'),
+                    'has_promo': price_data.get('has_promo', False),
+                    'check_date': date_str,
+                    'store_number': store_info[1] if store_info else 'Неизвестно'
+                }
+        
+        return None
+        
+    except Exception as e:
+        logging.error(f"Ошибка получения последней цены: {e}")
+        return None
